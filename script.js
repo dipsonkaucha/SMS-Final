@@ -74,15 +74,16 @@ function showMonthlyReport(monthIndex = new Date().getMonth()) {
   const monthName = new Date(0, monthIndex).toLocaleString("default", { month: "long" });
 
   let table = `<h3 class='text-lg font-semibold mb-2 text-center'>Attendance Report for ${monthName} ${year}</h3>`;
-  table += `<table class="min-w-full border text-center text-sm">
-    <thead><tr><th class="border px-2 py-1">Roll No.</th><th class="border px-2 py-1">Name</th>`;
+  table += `<div id="printArea" style="overflow-x:auto;">
+    <table class="min-w-full border text-center text-sm">
+    <thead><tr><th class="border px-2 py-1">Roll No.</th><th class="border px-4 py-1">Name</th>`;
   for (let d = 1; d <= daysInMonth; d++) {
     table += `<th class="border px-2 py-1">${d}</th>`;
   }
   table += `</tr></thead><tbody>`;
 
   students.forEach((name, index) => {
-    table += `<tr><td class="border px-2 py-1">${index + 1}</td><td class="border px-2 py-1">${name}</td>`;
+    table += `<tr><td class="border px-2 py-1">${index + 1}</td><td class="border px-4 py-1 text-left">${name}</td>`;
     for (let d = 1; d <= daysInMonth; d++) {
       const dateStr = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       const status = attendanceData[dateStr]?.[name];
@@ -94,35 +95,52 @@ function showMonthlyReport(monthIndex = new Date().getMonth()) {
     table += `</tr>`;
   });
 
-  table += `</tbody></table>`;
+  table += `</tbody></table></div>`;
   reportContent.innerHTML = table;
   monthlyReportContainer.classList.remove("hidden");
 }
 
 renderAttendanceInputs();
 
-// Export report to PDF
+// Export report to PDF (Final Fix)
 async function exportToPDF() {
-  const reportElement = document.getElementById("reportContent");
   const { jsPDF } = window.jspdf;
   const monthIndex = parseInt(monthSelector.value);
   const monthName = new Date(0, monthIndex).toLocaleString("default", { month: "long" });
   const year = new Date().getFullYear();
 
+  // Clone content for full rendering
+  const reportContent = document.getElementById("reportContent");
+  const clone = reportContent.cloneNode(true);
+  clone.style.position = "absolute";
+  clone.style.left = "-9999px"; // Off-screen
+  clone.style.width = "auto";
+  document.body.appendChild(clone);
+
   try {
-    const canvas = await html2canvas(reportElement, { scale: 2, backgroundColor: "#ffffff" });
+    const canvas = await html2canvas(clone, {
+      scale: 3,
+      useCORS: true,
+      width: clone.scrollWidth,
+      height: clone.scrollHeight,
+      windowWidth: clone.scrollWidth,
+      windowHeight: clone.scrollHeight,
+    });
+
     const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF('l', 'mm', 'a4');
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    const imgWidthMM = canvas.width * 0.264583;
+    const imgHeightMM = canvas.height * 0.264583;
+    const pdf = new jsPDF("l", "mm", [imgWidthMM, imgHeightMM + 20]);
 
     pdf.setFontSize(16);
-    pdf.text(`Attendance Report for ${monthName} ${year}`, pdfWidth / 2, 10, { align: "center" });
-    pdf.addImage(imgData, 'PNG', 0, 20, pdfWidth, pdfHeight);
+    pdf.text(`Attendance Report for ${monthName} ${year}`, imgWidthMM / 2, 12, { align: "center" });
+    pdf.addImage(imgData, "PNG", 0, 20, imgWidthMM, imgHeightMM);
     pdf.save(`Attendance_Report_${monthName}_${year}.pdf`);
   } catch (err) {
     console.error("PDF export failed:", err);
-    alert("Failed to export PDF. Try again.");
+    alert("Export failed.");
+  } finally {
+    document.body.removeChild(clone); // Clean up
   }
 }
+
