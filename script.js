@@ -109,38 +109,52 @@ async function exportToPDF() {
   const monthName = new Date(0, monthIndex).toLocaleString("default", { month: "long" });
   const year = new Date().getFullYear();
 
-  // Clone content for full rendering
-  const reportContent = document.getElementById("reportContent");
-  const clone = reportContent.cloneNode(true);
-  clone.style.position = "absolute";
-  clone.style.left = "-9999px"; // Off-screen
-  clone.style.width = "auto";
-  document.body.appendChild(clone);
+  const originalTable = document.querySelector("#reportContent table");
+  if (!originalTable) {
+    alert("No table found to export.");
+    return;
+  }
+
+  const clone = originalTable.cloneNode(true);
+  const wrapper = document.createElement("div");
+  wrapper.style.position = "absolute";
+  wrapper.style.left = "-9999px";
+  wrapper.style.top = "0";
+  wrapper.style.display = "block";
+  wrapper.style.overflow = "visible";
+  wrapper.style.padding = "20px";
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
+  await new Promise(resolve => setTimeout(resolve, 300));
 
   try {
-    const canvas = await html2canvas(clone, {
+    const canvas = await html2canvas(wrapper, {
       scale: 3,
-      useCORS: true,
-      width: clone.scrollWidth,
-      height: clone.scrollHeight,
-      windowWidth: clone.scrollWidth,
-      windowHeight: clone.scrollHeight,
+      width: wrapper.scrollWidth,
+      height: wrapper.scrollHeight,
+      windowWidth: wrapper.scrollWidth,
+      windowHeight: wrapper.scrollHeight,
+      scrollX: 0,
+      scrollY: 0,
+      useCORS: true
     });
 
     const imgData = canvas.toDataURL("image/png");
     const imgWidthMM = canvas.width * 0.264583;
     const imgHeightMM = canvas.height * 0.264583;
-    const pdf = new jsPDF("l", "mm", [imgWidthMM, imgHeightMM + 20]);
 
+    const pdf = new jsPDF("l", "mm", [imgWidthMM, imgHeightMM + 20]);
     pdf.setFontSize(16);
     pdf.text(`Attendance Report for ${monthName} ${year}`, imgWidthMM / 2, 12, { align: "center" });
     pdf.addImage(imgData, "PNG", 0, 20, imgWidthMM, imgHeightMM);
     pdf.save(`Attendance_Report_${monthName}_${year}.pdf`);
   } catch (err) {
     console.error("PDF export failed:", err);
-    alert("Export failed.");
+    alert("Failed to export full report. Try again.");
   } finally {
-    document.body.removeChild(clone); // Clean up
+    document.body.removeChild(wrapper);
   }
 }
+
 
